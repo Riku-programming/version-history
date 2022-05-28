@@ -1,0 +1,10 @@
+dev
+axl-gear-settings,release/211Q-1.0,5ca9386bd66c92f8d15acc81a43c05a4d843ef72
+nesic-settings,release/211Q-1.2,33dc178c2538cc1a719b4af7cbbbf186c147fb49
+axl-gear,release/212Q-3.1.16.6,375f246e6961426a5a24b92e1e47b033c3bc740d
+nesic-addon,release/221Q-1.0,ece3210a30855915792285a285d36eb60e6d44e1
+sony-payment-addon,hotfix/52957,f2a07a766c8d50592751092d969c96ad0c91351c
+yamato-credit-addon,release/221Q-1.0,7422efb9bb23683d2c057c643f41aa6c72112530
+axl-gear-tools,release/221Q-1.1,a20772dade803a3acc91103baa94a034f807f931
+g2g-addon,release/222Q-1.0,cdb8ce788d78cd1d8cbfc1fb0beeb369cf344cd0
+simulation-addon,develop,50cad87c4d176e169f7c5ab1f37f10a723ef557d
