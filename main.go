@@ -15,41 +15,39 @@ const compareFileName string = "compare.txt"
 const versionHistoryFileName string = "version_history.txt"
 const dateLayout string = "2006-01-02"
 
-const URL string = "https://test-nesic-cp.axlbox.biz/common/versions.txt"
+//const URL string = "https://test-nesic-cp.axlbox.biz/common/versions.txt"
 
 func main() {
-	if err := writeLine(fetchVersion(URL)); err != nil {
-		fmt.Println(os.Stderr, err)
-		os.Exit(1)
+	file, err := os.Open("client_host.txt")
+	if err != nil {
+		log.Fatalf("Error when opening file: %s", err)
+	}
+	fileScanner := bufio.NewScanner(file)
+	for fileScanner.Scan() {
+		URL := fileScanner.Text()
+		if err := writeLine(fetchVersion(URL)); err != nil {
+			fmt.Println(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := fileScanner.Err(); err != nil {
+			log.Fatalf("Error while reading file %s", err)
+		}
+		if deepCompare(latestFileName, compareFileName) == false {
+			fmt.Println("Difference")
+			removeFile(latestFileName)
+			renameFile(compareFileName, latestFileName)
+		} else {
+			fmt.Println("Same")
+			removeFile(compareFileName)
+		}
+		appendHistory(URL)
+		file.Close()
 	}
 
-	//file, err := os.Open("client_host.txt")
-	//if err != nil {
-	//	log.Fatalf("Error when opening file: %s", err)
-	//}
-	//fileScanner := bufio.NewScanner(file)
-
-	//for fileScanner.Scan() {
-	//	URL := fileScanner.Text()
-	//	fmt.Println(URL)
-	//if err := fileScanner.Err(); err != nil {
-	//	log.Fatalf("Error while reading file %s", err)
-	//}
-	//file.Close()
-
-	if deepCompare(latestFileName, compareFileName) == false {
-		fmt.Println("Difference")
-		removeFile(latestFileName)
-		renameFile(compareFileName, latestFileName)
-		appendHistory()
-	} else {
-		fmt.Println("Same")
-		removeFile(compareFileName)
-	}
 }
 
-func fetchVersion(url string) string {
-	curl := exec.Command("curl", url)
+func fetchVersion(URL string) string {
+	curl := exec.Command("curl", URL)
 	out, err := curl.Output()
 	if err != nil {
 		fmt.Println("error", err)
@@ -58,6 +56,7 @@ func fetchVersion(url string) string {
 	return string(out)
 }
 
+//
 func writeLine(lines string) error {
 	file, err := os.Create(compareFileName)
 	if err != nil {
@@ -74,7 +73,7 @@ func writeLine(lines string) error {
 	return nil
 }
 
-func appendHistory() {
+func appendHistory(URL string) {
 	nowTime := time.Now().Format(dateLayout)
 	file, err := os.OpenFile(versionHistoryFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
