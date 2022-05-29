@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -19,6 +20,7 @@ const dateLayout string = "2006-01-02"
 //const URL string = "https://test-nesic-cp.axlbox.biz/common/versions.txt"
 
 func main() {
+	now := time.Now()
 	file, err := os.Open("client_host.txt")
 	if err != nil {
 		log.Fatalf("Error when opening file: %s", err)
@@ -29,6 +31,12 @@ func main() {
 		arr := strings.Split(clientData, ",")
 		clientName := arr[0]
 		URL := arr[1]
+		if fileExists(clientName+latestFileName) == false {
+			createFile(clientName+latestFileName, fetchVersion(URL))
+		}
+		if fileExists(clientName+versionHistoryFileName) == false {
+			createFile(clientName+versionHistoryFileName, fetchVersion(URL))
+		}
 		if err := writeLine(clientName+compareFileName, fetchVersion(URL)); err != nil {
 			fmt.Println(os.Stderr, err)
 			os.Exit(1)
@@ -47,10 +55,23 @@ func main() {
 		}
 	}
 	err = file.Close()
+	fmt.Printf("経過: %vms\n", time.Since(now).Milliseconds())
 	if err != nil {
 		return
 	}
 	return
+}
+
+func fileExists(fileName string) bool {
+	_, err := os.Stat(fileName)
+	return !os.IsNotExist(err)
+}
+
+func createFile(fileName, versionData string) {
+	err := ioutil.WriteFile(fileName, []byte(versionData), 0644)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func fetchVersion(URL string) string {
@@ -139,8 +160,3 @@ func renameFile(oldFilename, newFilename string) {
 		fmt.Println(err)
 	}
 }
-
-// ファイルから1行ずつ読み込む　それをURLとして読み込む
-// nesic,https://test-nesic-cp.axlbox.biz/common/versions.txt
-// こんな感じで値が出るから nesic = Arr[0] https: Arr[1]
-// forでまわす
