@@ -1,3 +1,0 @@
-nesic,https://test-nesic-cp.axlbox.biz/common/versions.txt
-netwd,https://cloudnew-cp.networld.co.jp/common/versions.txt
-

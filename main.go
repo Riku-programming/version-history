@@ -4,88 +4,108 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
-const latestFileName string = "latest.txt"
-const compareFileName string = "compare.txt"
-const versionHistoryFileName string = "version_history.txt"
+const HostFileName string = "client_host.txt"
+const latestFileName string = "-latest.txt"
+const compareFileName string = "-compare.txt"
+const versionHistoryFileName string = "-version_history.txt"
 const dateLayout string = "2006-01-02"
 
-const URL string = "https://test-nesic-cp.axlbox.biz/common/versions.txt"
-
 func main() {
-	if err := writeLine(fetchVersion(URL)); err != nil {
-		fmt.Println(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	//file, err := os.Open("client_host.txt")
-	//if err != nil {
-	//	log.Fatalf("Error when opening file: %s", err)
-	//}
-	//fileScanner := bufio.NewScanner(file)
-
-	//for fileScanner.Scan() {
-	//	URL := fileScanner.Text()
-	//	fmt.Println(URL)
-	//if err := fileScanner.Err(); err != nil {
-	//	log.Fatalf("Error while reading file %s", err)
-	//}
-	//file.Close()
-
-	if deepCompare(latestFileName, compareFileName) == false {
-		fmt.Println("Difference")
-		removeFile(latestFileName)
-		renameFile(compareFileName, latestFileName)
-		appendHistory()
-	} else {
-		fmt.Println("Same")
-		removeFile(compareFileName)
-	}
-}
-
-func fetchVersion(url string) string {
-	curl := exec.Command("curl", url)
-	out, err := curl.Output()
+	now := time.Now()
+	fmt.Printf("Start: %vms\n", time.Since(now).Milliseconds())
+	file, err := os.Open(HostFileName)
 	if err != nil {
-		fmt.Println("error", err)
-		return "error"
+		log.Fatalf("Error when opening file: %s", err)
 	}
-	return string(out)
-}
-
-func writeLine(lines string) error {
-	file, err := os.Create(compareFileName)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	for _, line := range lines {
-		_, err := file.WriteString(string(line))
-		if err != nil {
-			return err
+	fileScanner := bufio.NewScanner(file)
+	for fileScanner.Scan() {
+		clientData := fileScanner.Text()
+		arr := strings.Split(clientData, ",")
+		clientName := arr[0]
+		URL := arr[1]
+		if fileExists(clientName+latestFileName) == false {
+			createFile(clientName+latestFileName, fetchVersion(URL))
+		}
+		if fileExists(clientName+versionHistoryFileName) == false {
+			createFile(clientName+versionHistoryFileName, fetchVersion(URL))
+		}
+		createFile(clientName+compareFileName, fetchVersion(URL))
+		if err := fileScanner.Err(); err != nil {
+			log.Fatalf("Error while reading file %s", err)
+		}
+		if compare(clientName+latestFileName, clientName+compareFileName) == false {
+			removeFile(clientName + latestFileName)
+			renameFile(clientName+compareFileName, clientName+latestFileName)
+			appendHistory(clientName+versionHistoryFileName, URL)
+		} else {
+			removeFile(clientName + compareFileName)
 		}
 	}
-	return nil
+	err = file.Close()
+	fmt.Printf("End: %vms\n", time.Since(now).Milliseconds())
+	if err != nil {
+		return
+	}
+	return
 }
 
-func appendHistory() {
+func fileExists(fileName string) bool {
+	_, err := os.Stat(fileName)
+	return !os.IsNotExist(err)
+}
+
+func createFile(fileName string, versionData []byte) {
+	err := ioutil.WriteFile(fileName, versionData, 0644)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func fetchVersion(URL string) []byte {
+	now := time.Now()
+	curl := exec.Command("curl", URL)
+	fmt.Printf("fetchversion Curl: %vms\n", time.Since(now).Milliseconds())
+	out, err := curl.Output()
+	fmt.Printf("fetchversion Output: %vms\n", time.Since(now).Milliseconds())
+	if err != nil {
+		fmt.Println("error", err)
+		return nil
+	}
+	fmt.Printf("fetchversion End: %vms\n", time.Since(now).Milliseconds())
+	return out
+}
+
+func appendHistory(fileName, URL string) {
 	nowTime := time.Now().Format(dateLayout)
-	file, err := os.OpenFile(versionHistoryFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
-	fmt.Fprintln(file, nowTime)
-	fmt.Fprintln(file, fetchVersion(URL))
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
+	_, err = fmt.Fprintln(file, nowTime)
+	if err != nil {
+		return
+	}
+	_, err = fmt.Fprintln(file, fetchVersion(URL))
+	if err != nil {
+		return
+	}
 }
 
-func deepCompare(file1, file2 string) bool {
+func compare(file1, file2 string) bool {
 	sf, err := os.Open(file1)
 	if err != nil {
 		log.Fatal(err)
@@ -117,8 +137,3 @@ func renameFile(oldFilename, newFilename string) {
 		fmt.Println(err)
 	}
 }
-
-// ファイルから1行ずつ読み込む　それをURLとして読み込む
-// nesic,https://test-nesic-cp.axlbox.biz/common/versions.txt
-// こんな感じで値が出るから nesic = Arr[0] https: Arr[1]
-// forでまわす
