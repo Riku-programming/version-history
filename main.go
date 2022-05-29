@@ -7,12 +7,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
-const latestFileName string = "latest.txt"
-const compareFileName string = "compare.txt"
-const versionHistoryFileName string = "version_history.txt"
+const latestFileName string = "-latest.txt"
+const compareFileName string = "-compare.txt"
+const versionHistoryFileName string = "-version_history.txt"
 const dateLayout string = "2006-01-02"
 
 //const URL string = "https://test-nesic-cp.axlbox.biz/common/versions.txt"
@@ -24,26 +25,32 @@ func main() {
 	}
 	fileScanner := bufio.NewScanner(file)
 	for fileScanner.Scan() {
-		URL := fileScanner.Text()
-		if err := writeLine(fetchVersion(URL)); err != nil {
+		clientData := fileScanner.Text()
+		arr := strings.Split(clientData, ",")
+		clientName := arr[0]
+		URL := arr[1]
+		if err := writeLine(clientName+compareFileName, fetchVersion(URL)); err != nil {
 			fmt.Println(os.Stderr, err)
 			os.Exit(1)
 		}
 		if err := fileScanner.Err(); err != nil {
 			log.Fatalf("Error while reading file %s", err)
 		}
-		if deepCompare(latestFileName, compareFileName) == false {
+		if deepCompare(clientName+latestFileName, clientName+compareFileName) == false {
 			fmt.Println("Difference")
-			removeFile(latestFileName)
-			renameFile(compareFileName, latestFileName)
+			removeFile(clientName + latestFileName)
+			renameFile(clientName+compareFileName, clientName+latestFileName)
+			appendHistory(clientName+versionHistoryFileName, URL)
 		} else {
 			fmt.Println("Same")
-			removeFile(compareFileName)
+			removeFile(clientName + compareFileName)
 		}
-		appendHistory(URL)
-		file.Close()
 	}
-
+	err = file.Close()
+	if err != nil {
+		return
+	}
+	return
 }
 
 func fetchVersion(URL string) string {
@@ -57,12 +64,17 @@ func fetchVersion(URL string) string {
 }
 
 //
-func writeLine(lines string) error {
-	file, err := os.Create(compareFileName)
+func writeLine(fileName, lines string) error {
+	file, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	for _, line := range lines {
 		_, err := file.WriteString(string(line))
@@ -73,15 +85,26 @@ func writeLine(lines string) error {
 	return nil
 }
 
-func appendHistory(URL string) {
+func appendHistory(fileName, URL string) {
 	nowTime := time.Now().Format(dateLayout)
-	file, err := os.OpenFile(versionHistoryFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
-	fmt.Fprintln(file, nowTime)
-	fmt.Fprintln(file, fetchVersion(URL))
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
+	_, err = fmt.Fprintln(file, nowTime)
+	if err != nil {
+		return
+	}
+	_, err = fmt.Fprintln(file, fetchVersion(URL))
+	if err != nil {
+		return
+	}
 }
 
 func deepCompare(file1, file2 string) bool {
